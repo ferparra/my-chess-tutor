@@ -114,11 +114,12 @@ jobs:
             --recursive . \
             --exclude .venv,tests \
             --configfile pyproject.toml \
-            --no-skips \
+            --ignore-nosec \
             --severity-level medium
-        # --no-skips  : treats any remaining `# nosec` as a hard error
-        # --severity-level medium : fails on MEDIUM or HIGH findings only;
-        #   LOW findings are informational and do not block the build
+        # --ignore-nosec    : bandit does NOT honour # nosec comments; any finding
+        #                     is still reported even if annotated (belt-and-suspenders
+        #                     alongside the grep guard above)
+        # --severity-level medium : fails on MEDIUM or HIGH findings only
 
       - name: pip-audit — dependency vulnerability scan
         run: uv run pip-audit --strict
