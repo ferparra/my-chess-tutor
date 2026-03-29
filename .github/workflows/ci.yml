@@ -122,5 +122,11 @@ jobs:
         # --severity-level medium : fails on MEDIUM or HIGH findings only
 
       - name: pip-audit — dependency vulnerability scan
-        run: uv run pip-audit --strict
-        # --strict: exit non-zero if any vulnerability is found
+        run: |
+          uv run pip-audit --skip-editable \
+            --ignore-vuln GHSA-5239-wwwm-4pmq
+        # --skip-editable: skip our own local package (not on PyPI, no CVEs to check)
+        # pip-audit exits non-zero by default when any unfixed CVE is found
+        # GHSA-5239-wwwm-4pmq (CVE-2026-4539): ReDoS in pygments AdlLexer, local-access
+        #   only, transitive dep via rich — no fixed version available upstream yet.
+        #   Remove this exemption once pygments releases a patch.
