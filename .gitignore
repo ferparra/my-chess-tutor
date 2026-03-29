@@ -1,0 +1,24 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Tool caches
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.bandit/
+
+# Runtime data written by the app
+~/.my_chess_tutor/
+
+# Secrets — never commit these
+.env
+*.env
+config.json

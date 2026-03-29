@@ -1,0 +1,36 @@
+Please review {{ player_name }}'s game.
+
+## Game facts
+- Playing as: {{ color }}
+- Result: {{ result }}
+- Accuracy: {{ accuracy_pct }}%
+- Errors: {{ blunders }} blunder(s), {{ mistakes }} mistake(s), {{ inaccuracies }} inaccuracy/inaccuracies
+{% if opening_name %}
+- Opening: {{ opening_name }}
+{% endif %}
+
+## Moves that need attention
+{% if critical_moves %}
+{% for m in critical_moves %}
+- Move {{ m.move_number }} — {{ m.san }} ({{ m.label }}): engine preferred {{ m.best_san }}
+{% endfor %}
+{% else %}
+No major errors — a clean game!
+{% endif %}
+
+## Patterns the engine flagged
+{{ themes | join(", ") }}
+
+{% if prior_weak_principles %}
+## What {{ player_name }} has struggled with across past games
+{{ prior_weak_principles | join(", ") }}
+Keep these in mind when identifying the lesson for each moment.
+{% endif %}
+
+## Your task
+Write a structured review. For each critical moment, identify the chess **principle** being
+violated (e.g. "King Safety", "Development", "Piece Safety", "Center Control", "Piece Activity",
+"Tactical Awareness", "Pawn Structure", "Endgame Principles") and explain it in plain English.
+Give {{ player_name }} one concrete question to ask themselves before making that type of move.
+
+Keep the tone warm and encouraging. Focus on understanding, not on the specific moves.

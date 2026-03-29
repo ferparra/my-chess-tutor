@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel in-progress runs for the same branch when new commits are pushed.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # (a) Static type check — mypy must report zero errors across all files.
+  #     Additionally, we assert that no suppression comments exist in the
+  #     codebase: `# type: ignore` bypasses the checker and is not allowed.
+  # ---------------------------------------------------------------------------
+  typecheck:
+    name: Type Check (mypy)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Assert no suppression comments
+        # Any `# type: ignore` comment disables mypy for that line.
+        # We forbid them entirely so the type check is always complete.
+        run: |
+          if grep -rn --include="*.py" "# type: ignore" --exclude-dir=.venv .; then
+            echo "❌ Found '# type: ignore' comments. Fix the type errors instead."
+            exit 1
+          fi
+          echo "✅ No type suppression comments found."
+
+      - name: mypy
+        run: uv run mypy . --warn-unused-ignores
+
+  # ---------------------------------------------------------------------------
+  # (b) Automated tests — all 118 tests must pass.
+  # ---------------------------------------------------------------------------
+  tests:
+    name: Tests (pytest)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: pytest
+        run: uv run pytest --tb=short
+
+  # ---------------------------------------------------------------------------
+  # (c) Security — three independent checks:
+  #
+  #   1. gitleaks   — scans the full git history for hardcoded secrets,
+  #                   API keys, tokens, and credentials.
+  #   2. bandit     — Python SAST: insecure patterns, dangerous calls, etc.
+  #                   Runs without nosec support so suppression comments are
+  #                   treated as findings, not exemptions.
+  #   3. pip-audit  — checks every installed dependency against the OSV and
+  #                   PyPI vulnerability databases (CVEs, GHSAs).
+  #
+  #   Additionally, we assert that no `# nosec` bypass comments exist in the
+  #   codebase — all security findings must be fixed, not silenced.
+  # ---------------------------------------------------------------------------
+  security:
+    name: Security
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history required for gitleaks history scan
+
+      - name: gitleaks — scan for hardcoded secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Assert no nosec suppression comments
+        # `# nosec` silences bandit findings. We require all issues to be
+        # fixed at the source rather than bypassed with annotations.
+        run: |
+          if grep -rn --include="*.py" "# nosec" --exclude-dir=.venv .; then
+            echo "❌ Found '# nosec' comments. Fix the security issue instead."
+            exit 1
+          fi
+          echo "✅ No bandit suppression comments found."
+
+      - name: bandit — Python SAST
+        run: |
+          uv run bandit \
+            --recursive . \
+            --exclude .venv,tests \
+            --configfile pyproject.toml \
+            --no-skips \
+            --severity-level medium
+        # --no-skips  : treats any remaining `# nosec` as a hard error
+        # --severity-level medium : fails on MEDIUM or HIGH findings only;
+        #   LOW findings are informational and do not block the build
+
+      - name: pip-audit — dependency vulnerability scan
+        run: uv run pip-audit --strict
+        # --strict: exit non-zero if any vulnerability is found
